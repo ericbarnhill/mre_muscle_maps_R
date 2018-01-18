@@ -1,0 +1,36 @@
+model {
+
+    for (i in 1:length(y)) {
+        y[i] ~ dgamma(shape, shape / pred[i])
+        log(pred[i]) <- beta0 + beta1[group[i]] + beta2[muscle[i]] + 
+            beta3[muscle[i]]*condition[i] + beta4[pixel[i]]
+    }
+    for (j in 1:nGroups) {
+        beta1[j] ~ dnorm(mu_group, tau_group)
+    }
+    for (k in 1:N) {
+        beta2[k] ~ dnorm(mu_muscle_int, tau_muscle_int)
+        beta3[k] ~ dnorm(mu_muscle_slope, tau_muscle_slope)
+    }
+    or (m in 1:nPixels) {
+        pixel[m] ~ dnorm(mu_pixel, tau_pixel)
+    }
+    shape ~ dunif(0.001, 1000)
+
+    mu_group ~ dnorm(0, 1 / 10000)
+    sig_group ~ dunif(0.001, 1000)
+    tau_group <- 1 / sig_group^2
+
+    mu_muscle_int ~ dnorm(0, 1 / 10000)
+    sig_muscle_int ~ dunif(0.001, 1000)
+    tau_muscle_int <- 1 / sig_muscle_int^2
+
+    mu_muscle_slope ~ dnorm(0, 1 / 10000)
+    sig_muscle_slope ~ dunif(0.001, 1000)
+    tau_muscle_slope <- 1 / sig_muscle_slope^2
+
+    mu_pixel ~ dnorm(0, 1 / 10000)
+    sig_pixel ~ dunif(0.001, 1000)
+    tau_pixel <- 1 / sig_pixel^2
+
+}

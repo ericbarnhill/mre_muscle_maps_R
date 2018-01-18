@@ -1,0 +1,19 @@
+model {
+    for (i in 1:length(y)) {
+        y[i] ~ dgamma(shape, shape / pred[i])
+        log(pred[i]) <- alpha[musc[i]] + beta1[musc[i]]*cond[i]
+    }
+    for (j in 1:N) {
+        alpha[j] ~ dnorm(mu_alpha, tau_alpha)
+        beta1[j] ~ dnorm(mu_beta, tau_beta)
+    }
+    shape ~ dunif(0.001, 1000)
+
+    mu_alpha ~ dnorm(0, 1 / 10000)
+    sig_alpha ~ dunif(0.001, 1000)
+    tau_alpha <- 1 / sig_alpha^2
+
+    mu_beta ~ dnorm(0, 1 / 10000)
+    sig_beta ~ dunif(0.001, 1000)
+    tau_beta <- 1 / sig_beta^2
+}
