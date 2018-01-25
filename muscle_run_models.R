@@ -1,20 +1,21 @@
-
+require(rjags)
 # if model is a map, include nPixels, else skip
-run_muscle_model <- function(data_tall, model_path, nPixels) {
-    if (missing(nPixels)) {
-        jags_data <- list(y = data_tall$Value, musc=data_tall$musc_id, 
-                          cond=data_tall$cond_id, 
-                          nMuscles=length(levels(data_tall$musc_id)))
+run_muscle_model <- function(data_tall, model_path, is.map, varNames) {
+    if (is.map) {
+        jags_data <- list(y = data_tall$value, musc=data_tall$musc_id, 
+                          cond=data_tall$cond_id, pix = data_tall$pix_id,
+                          nMusc=length(levels(data_tall$musc_id)),
+                          nPix=length(levels(data_tall$pix_id)) )
     } else {
-        jags_data <- list(y = data_tall$Value, musc=data_tall$musc_id, 
+        jags_data <- list(y = data_tall$value, musc=data_tall$musc_id, 
                           cond=data_tall$cond_id, 
-                          nMuscles=length(levels(data_tall$musc_id)),
-                          nPixels=length(levels(data_tall$pix_id)) )
+                          nMusc=length(levels(data_tall$musc_id)))
     }
     muscle_mod <- jags.model(file=model_path, data=jags_data, n.chains=3) 
-    muscle_mod_sim <- coda.samples(model = muscle_mod, variable.names = c("alpha", "beta1"), n.iter = 5e3)
+    update(muscle_mod, 1e3)
+    muscle_mod_sim <- coda.samples(model = muscle_mod, variable.names = varNames, n.iter = 5e3)
     muscle_mod_csim <- as.mcmc(do.call(rbind, muscle_mod_sim))
-    DIC <- dic.samples(muscle_mod, 3e3, 3)
+    DIC <- dic.samples(muscle_mod, 1e3)
     Gelman <- gelman.diag(muscle_mod_sim)
     Raftery <- raftery.diag(muscle_mod_sim)
     Autocorr <- autocorr.diag(muscle_mod_sim)
@@ -24,7 +25,8 @@ run_muscle_model <- function(data_tall, model_path, nPixels) {
                       csim=muscle_mod_csim, means=means, hdis=hdis,
                       DIC=DIC, Gelman=Gelman,
                       Raftery=Raftery, Autocorr=Autocorr)
-
+    save(list=c("model_results"), file="models_temp.RData")
+    return(model_results)
 }
 
 # get ranges in pascals
@@ -63,5 +65,22 @@ mcmc_to_cond_means <- function(csim) {
     conds <- data.frame(cond_lo, cond_hi)
 }
 
-
+run_models <- function(data_tall) {
+    model_folder <- file.path(proj_path, "models/")
+    varNames_array <- list(c("beta0", "beta1", "delta0", "delta1"), 
+                        c("beta0", "beta1", "beta2"))
+    model_paths <- dir(model_folder)
+    for (m in 1:length(model_paths)) {
+        # if model is a map, add nPixels
+        if (m == 2) {
+            model_results[[m]] = run_muscle_model(data_tall, file.path(model_folder, model_paths[m]),
+                             T, varNames_array[[m]])
+        } else {
+            model_results[[m]] = run_muscle_model(data_tall, file.path(model_folder, model_paths[m]), 
+                             F, varNames_array[[m]])
+        }
+    }
+    save(list=c("model_results"), file="models_complete.RData")
+    return(model_results)
+}
 

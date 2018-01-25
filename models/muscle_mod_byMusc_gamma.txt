@@ -1,0 +1,28 @@
+model {
+    for (i in 1:length(y)) {
+        y[i] ~ dgamma(shape[i], shape[i] / pred[i])
+        log(pred[i]) <- beta0[musc[i]] + beta1[musc[i]]*cond[i]
+        shape[i] <- delta0[musc[i]] + delta1[musc[i]]*cond[i] 
+    }
+    for (j in 1:nMusc) {
+        beta0[j] ~ dnorm(mu_beta0, tau_beta0)
+        beta1[j] ~ dnorm(mu_beta1, tau_beta1)
+        delta0[j] ~ dexp(lam0)
+        delta1[j] ~ dnorm(mu_delta1, tau_delta1)
+    }
+
+    mu_beta0 ~ dnorm(0, 1 / 10000)
+    sig_beta0 ~ dunif(0.001, 1000)
+    tau_beta0 <- 1 / sig_beta0^2
+
+    mu_beta1 ~ dnorm(0, 1 / 10000)
+    sig_beta1 ~ dunif(0.001, 1000)
+    tau_beta1 <- 1 / sig_beta1^2
+
+    lam0 ~ dunif(0.001, 1000)
+    
+    mu_delta1 ~ dnorm(0, 1 / 10000)
+    sig_delta1 ~ dunif(0.001, 1000)
+    tau_delta1 <- 1 / sig_delta1^2
+
+}

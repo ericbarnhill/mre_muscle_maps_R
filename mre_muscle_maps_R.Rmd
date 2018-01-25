@@ -1,0 +1,82 @@
+---
+title: "Bayesian Mapping of Functional Muscle MRE Data"
+author: "Eric Barnhill"
+date: "January 19, 2018"
+output: html_notebook
+bibliography: /home/ericbarnhill/Documents/git-misc/master-bibliography.bib
+csl: /home/ericbarnhill/Documents/code/styles/cell-numeric.csl
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(rjags)
+require(HDInterval)
+require(ggplot2)
+require(captioner)
+proj_path="/home/ericbarnhill/Documents/code/R/mre_muscle_maps_R/"
+setwd(proj_path)
+source(file.path(proj_path, "mre_muscle_captions.R"))
+fig_nums <- captioner::captioner(prefix = "Fig.")
+```
+
+## Introduction
+
+Magnetic Resonance Elastography (MRE) generates maps of tissue viscoelastic properties (for more details see [@hirsch2016magnetic]). In this study, such maps were acquired for a cohort of subjects both before and after eccentric muscle damage. This study aimed to analyse the location and extent of the impact of muscle damage on muscle viscoelastic properties.
+
+As elastography is an experimental measurement method, it was unknown what the stability and certainty levels of the data would be, and consequently what models would capture effects most robustly. We sought to generate a voxel-wise map of effects, but also investigated muscle-wise statistical models as they were expected to show increased robustness and statistical power due to pooling of data points.
+
+## Data Exploration
+
+# Data distributions
+
+Data was assembled into tidy format from separate spreadsheets by subject and muscle.
+```{r}
+source('muscle_load_clean_data.R')
+data_tall <- load_clean_data(file.path(proj_path, data_path))
+```
+A boxplot of stiffness values by muscle group, shows heavy right skew, classic signs of a gamma or lognormal distribution. Comparing the groups pre- and post- shows that while the medians of the distributions remain relatively similar, for some groups (including the Vastus muscles) the skew increases greatly. This suggests that some of the effect mays be in the dispersion function of the distribution and not just the central tendency. We therefore probably want to model the shape function by muscle and condition, rather than just the scaling function (or its inverse, the rate function).
+
+tab.1_cap <- fig_nums(name = "tab_1", 
+                        caption = "German Bundesliga: Final Table 2015/16, Position 7-12")
+`r fig_nums('fig_1')`
+```{r table1, fig.cap = fig.1_cap}
+ggplot(data_tall) + 
+    geom_boxplot(aes(x=musc_id, y=value)) +
+    facet_grid(. ~ cond_id) + 
+    labs(title="Value By Muscle, Pre And Post",x="Muscle",y="Shear Modulus(Pa)")
+```
+To evaluate whether a lognormal or gamma model would be more suitable, we look at the same boxplot of the log values:
+`r fig_nums('fig_2')`
+```{r table2, fig.cap = fig.2_cap}
+ggplot(data_tall) + 
+    geom_boxplot(aes(x=musc_id, y=log(value))) +
+    facet_grid(. ~ cond_id) +
+    labs(title="Log Value By Muscle, Pre And Post",x="Muscle",y="Shear Modulus(Pa)")
+```
+`r f.ref('fig_2')` shows that the skew ranges from roughly even (normal) but also many distributions skew left, with more extreme values on bottom than on top. As the log of a gamma skews left, gamma distributions will be used for the best fit. Normal models will also be run  as a "reality check", because the immediate outputs are more intuitive, and we expect predicted values to be similar to the gamma outputs but have less overall goodness of fit.
+
+# Relationships between groups
+
+Each data entry has a pixel-wise location, a muscle location, and a location within a muscle group. The above boxplots show differences between muscle medians that are credibly worth exploring. Below we look at the data by muscle group, again against the log value:
+
+`r fig_nums('fig_3')`
+```{r table3, fig.cap = fig.3_cap}
+ggplot(data_tall) + 
+    geom_boxplot(aes(x=grp_id, y=log(value))) +
+    facet_grid(. ~ cond_id) +
+    labs(title="Log Value By Muscle, Pre And Post",x="Muscle",y="Shear Modulus(Pa)")
+```
+
+`r f.ref('fig_3')` shows similar trends. Medians, in particular of adductors and extensors, are quite similar, indicating that modelling an intercept by muscle group will likely produce uniqueness problems. All three muscle groups show left skew in the log plot, supporting use of the gamma distribution. Finally, we see slight change in dispersion of the function in adductors and hamstrings, but large increase in dispersion of the quadriceps.
+
+## Data Modeling
+
+The data exploration yielded the following conclusions:
+
+- Model the distributions with gamma functions
+- Intercept by muscle group is likely to be indeterminate. Intercept by muscle will be modeled but, as central tendency is small relative to dispersion, the model may be very uncertain
+- Shape of distribution should be modeled by muscle and possibly also by muscle group
+
+A 2x2 grid of possible models was therefore considered:
+
+

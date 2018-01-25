@@ -1,0 +1,24 @@
+model {
+
+    for (i in 1:length(y)) {
+        y[i] ~ dgamma(shape, shape / pred[i])
+        log(pred[i]) <- beta0[pix[i]] +
+            beta1[pix[i]]*cond[i]
+    }
+    
+    for (k in 1:nPix) {
+        beta0[k] ~ dnorm(mu_pix, tau_pix)
+        beta1[k] ~ dnorm(mu_change, tau_change)
+    }
+    
+    shape ~ dunif(0.001, 1000)
+ 
+    mu_pix ~ dnorm(0, 1 / 10000)
+    sig_pix ~ dunif(0.001, 1000)
+    tau_pix <- 1 / sig_pix^2
+    
+    mu_change ~ dnorm(0, 1 / 10000)
+    sig_change ~ dunif(0.001, 1000)
+    tau_change <- 1 / sig_changex^2
+
+}

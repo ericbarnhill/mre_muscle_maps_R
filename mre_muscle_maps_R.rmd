@@ -1,0 +1,142 @@
+---
+title: "Bayesian Mapping of Functional Muscle MRE Data"
+author: "Eric Barnhill"
+date: "January 19, 2018"
+output: html_document
+bibliography: /home/ericbarnhill/Documents/git-misc/master-bibliography.bib
+csl: /home/ericbarnhill/Documents/code/styles/cell-numeric.csl
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(rjags)
+require(HDInterval)
+require(ggplot2)
+require(captioner)
+proj_path="/home/ericbarnhill/Documents/code/R/mre_muscle_maps_R/"
+setwd(proj_path)
+source(file.path(proj_path, "mre_muscle_captions.R"))
+```
+
+## Introduction
+
+Magnetic Resonance Elastography (MRE) generates maps of tissue viscoelastic properties (for more details see [@hirsch2016magnetic]). In this study, such maps were acquired for a cohort of subjects both before and after eccentric muscle damage. This study aimed to analyse the location and extent of the impact of muscle damage on muscle viscoelastic properties.
+
+As elastography is an experimental measurement method, it was unknown what the stability and certainty levels of the data would be, and consequently what models would capture effects most robustly. We sought to generate a voxel-wise map of effects, but also investigated muscle-wise statistical models as they were expected to show increased robustness and statistical power due to pooling of data points.
+
+## Data Exploration
+
+# Data distributions
+
+Data was assembled into tidy format from separate spreadsheets by subject and muscle.
+```{r}
+source('muscle_load_clean_data.R')
+data_tall <- load_clean_data(file.path(proj_path, data_path))
+```
+A boxplot of stiffness values by muscle group, shows heavy right skew, classic signs of a gamma or lognormal distribution. Comparing the groups pre- and post- shows that while the medians of the distributions remain relatively similar, for some groups (including the Vastus muscles) the skew increases greatly. This suggests that some of the effect mays be in the dispersion function of the distribution and not just the central tendency. We therefore probably want to model the shape function by muscle and condition, rather than just the scaling function (or its inverse, the rate function).
+
+tab.1_cap <- fig_nums(name = "tab_1", 
+                        caption = "German Bundesliga: Final Table 2015/16, Position 7-12")
+`r fig_nums('fig_1')`
+```{r fig1, fig.cap = fig.1_cap}
+ggplot(data_tall) + 
+    geom_boxplot(aes(x=musc_id, y=value)) +
+    facet_grid(. ~ cond_id) + 
+    labs(title="Value By Muscle, Pre And Post",x="Muscle",y="Shear Modulus(Pa)")
+```
+To evaluate whether a lognormal or gamma model would be more suitable, we look at the same boxplot of the log values:
+`r fig_nums('fig_2')`
+```{r fig2, fig.cap = fig.2_cap}
+ggplot(data_tall) + 
+    geom_boxplot(aes(x=musc_id, y=log(value))) +
+    facet_grid(. ~ cond_id) +
+    labs(title="Log Value By Muscle, Pre And Post",x="Muscle",y="Shear Modulus(Pa)")
+```
+`r f.ref('fig_2')` shows that the skew ranges from roughly even (normal) but also many distributions skew left, with more extreme values on bottom than on top. As the log of a gamma skews left, gamma distributions will be used for the best fit. Normal models will also be run  as a "reality check", because the immediate outputs are more intuitive, and we expect predicted values to be similar to the gamma outputs but have less overall goodness of fit.
+
+# Relationships between groups
+
+Each data entry has a pixel-wise location, a muscle location, and a location within a muscle group. The above boxplots show differences between muscle medians that are credibly worth exploring. Below we look at the data by muscle group, again against the log value:
+
+`r fig_nums('fig_3')`
+```{r fig3, fig.cap = fig.3_cap}
+ggplot(data_tall) + 
+    geom_boxplot(aes(x=grp_id, y=log(value))) +
+    facet_grid(. ~ cond_id) +
+    labs(title="Log Value By Muscle, Pre And Post",x="Muscle",y="Shear Modulus(Pa)")
+```
+
+`r f.ref('fig_3')` shows similar trends. Medians, in particular of adductors and extensors, are quite similar, indicating that modelling an intercept by muscle group will likely produce uniqueness problems. However, the externsors show a clear change in dispersion that the adductors and flexors do not.
+
+All three muscle groups show some left skew in the log plot, supporting use of the gamma distribution. Finally, we see slight change in dispersion of the function in adductors and hamstrings, but large increase in dispersion of the quadriceps.
+
+## Data Modeling
+
+The data exploration yielded the following conclusions:
+
+1. Model the distributions with gamma functions
+2. Intercept by muscle group is likely to be indeterminate. Intercept by muscle will be modeled but, as central tendency is small relative to dispersion, the model may be very uncertain
+3. In the muscle-wise models, shape of distribution should be modeled by muscle
+4.However, the pixel-wise maps should not model by muscle, to better catch focused local changes that drive the effect in terms of dispersion rather than central tendency
+
+The third condition is slightly unusual, as the shape parameter of the Gamma distribution is often modeled as constant, but Bayesian analysis makes it straightforward to take this nuance into account. Essentially both models are attempts to model the dispersion effect, one with the shape of the value distribution within the muscle, one by modeling only on the pixel-wise level.
+
+Our final analysis thus investigated two models:
+
+- By Muscle:
+1. Gamma, Rate By Muscle, Shape By Muscle
+$$
+y_{ij} \sim Gamma(\alpha_{j}, \alpha_{j} / \gamma_{j}) \\
+log(\gamma_{j}) = \beta^{0}_{j} + \beta^{1}_{j} * I_{cond=POST} \\
+\alpha_{j} = \delta^{0}_{j} + \delta^{1}_{j} * I_{cond=POST} \\
+\beta^{0 \dots 1} \sim \mathcal{N}(\mu^{0 \dots 1}, (\sigma^{0 \dots 1})^2) \\
+\beta^{0 \dots 1} \sim exp(\lambda^{0 \dots 1})\\
+card(j) = card(muscles)
+$$
+2. Gamma, Rate By Pixel, Rate By Muscle, Shape By Muscle
+$$
+y_{ij} \sim Gamma(\alpha, \alpha / \gamma_{j}) \\
+log(\gamma_{j}) = \beta^{0}_{j} + \beta^{1}_{j} * I_{cond=POST} \\
+\alpha \sim \mathcal{U}(0.001, 100) \\
+\beta^{0 \dots 1} \sim \mathcal{N}(\mu^{0 \dots 1}, (\sigma^{0 \dots 1})^2) \\
+card(j) = card(pixels)
+$$
+Where $y_{ij}$ is a draw from the distribution, $\alpha$ is the shape parameter, $\gamma$ is the mean (and therefore $\frac{\alpha}{\gamma}$ is the rate parameter), the $\beta$ variables are linear predictors with mean $\mu$ and variance $\sigma^{2}$, and $I$ is an indicator function. Model 1 by muscle makes an unusual choice in modelling the shape function $\alpha$, which needed to be modelled as the addition of two nonzero distributions. A sum of two uniform distributions would concentrate weight at the center of the prior distribution; consequently exponential priors were chosen as these would concentrate more weight in the lower, more probable values of the shape function prior.
+
+## Results - Model By Muscle - Iteration 1
+
+# Diagnostics
+
+Gelman-Rubin diagnostics for variables $\beta_{0}$, $\beta_{1}$ and $\delta_{0}$ were all less than the typical convergence standards of $1.03$. The $\delta_{1}$ variable was less stable, with diagnostic range of $1-04 - 1.12$. This suggests that the most challenging aspect of the data to model, the change of the shape function across conditions, requires either more samples or a different prior to capture the behavior. It is well known that thin tails can require many samples to accurately model. 
+
+Autocorrelation diagnostics were, similarly, low with $\beta_{0}$, $\beta_{1}$ and $\delta_{0}$, with no correlation above $\pm 0.01$ at lag 50; however the $\delta_{1}$ variable had correlations from $0.07 - 0.12$ at lag 50.
+
+# Prior predictive modeling
+
+Original means versus predictive meands for each muscle median are shown below. 
+```{r fig.height = 3.5, fig.width = 7}
+source('mre_muscle_predict.R')
+load("models_temp.Rdata")
+means <- muscle_predict_original_means(data_tall, model_results$csim, T)
+```
+
+The model  and the original data showed good agreement on the larger muscles such as the adductors (AL, AM), biceps femoris (BLH,BSH), and extensors (VI, VL, VM). It showed poor predictivity on the muscle groups with much smaller numbers of samples (e.g. G, RF, S) and these variables also scored highest on both diagnostics.
+
+Below we compare histograms of the original and predicted data:
+```{r fig.height = 3.5, fig.width = 7}
+load("sample_histograms.RData")
+XLIMS = c(0, 4000)
+par(mfrow=c(2,2))
+hist(data_tall$value[which(data_tall$cond_id == "Pre" & data_tall$musc_id == "VL")], 
+     main="Orig Pre", breaks=32, xlim = XLIMS, xlab=NULL, ylab=NULL)
+hist(data_tall$value[which(data_tall$cond_id == "Post" & data_tall$musc_id == "VL")],
+     main="Orig Post", breaks=32, xlim = XLIMS, xlab=NULL, ylab=NULL)
+hist(sample_hist_off, main="Samples Pre", breaks=32, xlim = XLIMS, xlab=NULL, ylab=NULL)
+hist(sample_hist_on, main="Samples Post", breaks=32, xlim = XLIMS, xlab=NULL, ylab=NULL)
+```
+Here it can be seen that the tail of the original data increases from pre to post, however the tails between the pre- and post- conditions of the predictive posterior samples are very similar. This suggests that more samples will likely be needed to successfully model the changes in the thin tail at the top of the data.
+
+# Conclusion for Iteration 1
+
+This model struggled to converge or model the change in shape of the original data. Two likely ways to improve the model are to increase the number of samples, or to alter the prior on the change in shape function. For the second iteration, this second idea was tried first. The prior on $\delta_{0}$ was kept as an exponential, as it is known to be positive and not high, but $\delta_{1}$, as a change between two shapes, does not need this constraint. For the second iteration $\delta_{1}$ was modeled as normal.
+
