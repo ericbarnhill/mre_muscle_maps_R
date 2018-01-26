@@ -23,7 +23,7 @@ muscle_predict_original_means <- function(orig_data, csim, byMusc) {
             samples_off <- rgamma(10000, shape_off, rate_off)
             samples_on <- rgamma(10000, shape_on, rate_on)
             # save out sample historgrams for markdown
-            if (n == 11) {
+            if (n == 10) {
                 sample_hist_off <- samples_off
                 sample_hist_on <- samples_on
                 save(list=c("sample_hist_off", "sample_hist_on"), file = "sample_histograms.RData")

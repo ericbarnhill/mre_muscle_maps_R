@@ -114,29 +114,6 @@ Gelman-Rubin diagnostics for variables $\beta_{0}$, $\beta_{1}$ and $\delta_{0}$
 
 Autocorrelation diagnostics were, similarly, low with $\beta_{0}$, $\beta_{1}$ and $\delta_{0}$, with no correlation above $\pm 0.01$ at lag 50; however the $\delta_{1}$ variable had correlations from $0.07 - 0.12$ at lag 50.
 
-# Prior predictive modeling
-
-Original means versus predictive meands for each muscle median are shown below. 
-```{r fig.height = 3.5, fig.width = 7}
-#source('mre_muscle_predict.R')
-#load("models_temp.Rdata")
-#means <- muscle_predict_original_means(data_tall, model_results$csim, T)
-print("Chart accidentally lost (but can easily be remade)")
-```
-
-The model  and the original data showed good agreement on the larger muscles such as the adductors (AL, AM), biceps femoris (BLH,BSH), and extensors (VI, VL, VM). It showed poor predictivity on the muscle groups with much smaller numbers of samples (e.g. G, RF, S) and these variables also scored highest on both diagnostics.
-
-Below we compare histograms of the original and predicted data:
-```{r fig.height = 3.5, fig.width = 7}
-source('muscle_print_histogram_comparison.R')
-load(file.path(proj_path, "sample_histograms.RData"))
-ls()
-summary(sample_hist_on)
-#print_histogram_comparison(data_tall, sample_hist_on, sample_hist_off)
-
-```
-Here it can be seen that the tail of the original data increases from pre to post, however the tails between the pre- and post- conditions of the predictive posterior samples are very similar. This suggests that more samples will likely be needed to successfully model the changes in the thin tail at the top of the data.
-
 # Conclusion for Iteration 1
 
 This model struggled to converge or model the change in shape of the original data. Two likely ways to improve the model are to increase the number of samples, or to alter the prior on the change in shape function. For the second iteration, this second idea was tried first. The prior on $\delta_{0}$ was kept as an exponential, as it is known to be positive and not high, but $\delta_{1}$, as a change between two shapes, does not need this constraint. For the second iteration $\delta_{1}$ was modeled as normal.
@@ -150,3 +127,19 @@ load("models_temp.Rdata")
 means <- muscle_predict_original_means(data_tall, model_results$csim, T)
 ```
 Here the modelling appeared to be a good predictor for all muscles except G, RF, and S, which I believe are the three smallest, so perhaps their distriibutions are the least stable.
+
+Particularly of note are the values for the $\delta_{1}$ functions that represent the change in shape. Here $\delta_{0}$ and $\delta_{1}$ are contrasted:
+
+```{r}
+del0 <- model_results$csim[,which(grepl("delta0", colnames(model_results$csim)))]
+print("Delta 0 means:")
+print(colMeans(del0))
+del1 <- model_results$csim[,which(grepl("delta1", colnames(model_results$csim)))]
+print("Delta 1 means:")
+print(colMeans(del1))
+print("Pct change:")
+print(colMeans(del1) / colMeans(del0))
+```
+What this shows, is that the delta 1 values in the converged model are negative by a substantial percentage of the original shape function. That means that the shape is getting wider (as a higher shape value is a more sharply defined curve, and a low shape value is a very broad curve).  And so I think this is a first sign of our finding. 
+
+To be continued...
