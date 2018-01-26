@@ -1,4 +1,6 @@
 require(rjags)
+require(HDInterval)
+source("samples_to_hdis.R")
 # if model is a map, include nPixels, else skip
 run_muscle_model <- function(data_tall, model_path, is.map, varNames) {
     if (is.map) {

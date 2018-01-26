@@ -19,6 +19,6 @@ model {
     
     mu_change ~ dnorm(0, 1 / 10000)
     sig_change ~ dunif(0.001, 1000)
-    tau_change <- 1 / sig_changex^2
+    tau_change <- 1 / sig_change^2
 
 }

@@ -1,3 +1,6 @@
+require(tidyr)
+require(ggplot2)
+
 muscle_predict_original_means <- function(orig_data, csim, byMusc) {
     orig_means <- get_orig_means(orig_data, byMusc)
     sim_col_means <- colMeans(csim)

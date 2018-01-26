@@ -2,9 +2,11 @@
 title: "Bayesian Mapping of Functional Muscle MRE Data"
 author: "Eric Barnhill"
 date: "January 19, 2018"
-output: html_document
-bibliography: /home/ericbarnhill/Documents/git-misc/master-bibliography.bib
+output:
+  pdf_document: default
+  html_document: default
 csl: /home/ericbarnhill/Documents/code/styles/cell-numeric.csl
+bibliography: /home/ericbarnhill/Documents/git-misc/master-bibliography.bib
 ---
 
 ```{r setup, include=FALSE}
@@ -13,6 +15,7 @@ require(rjags)
 require(HDInterval)
 require(ggplot2)
 require(captioner)
+require(tidyr)
 proj_path="/home/ericbarnhill/Documents/code/R/mre_muscle_maps_R/"
 setwd(proj_path)
 source(file.path(proj_path, "mre_muscle_captions.R"))
@@ -115,24 +118,22 @@ Autocorrelation diagnostics were, similarly, low with $\beta_{0}$, $\beta_{1}$ a
 
 Original means versus predictive meands for each muscle median are shown below. 
 ```{r fig.height = 3.5, fig.width = 7}
-source('mre_muscle_predict.R')
-load("models_temp.Rdata")
-means <- muscle_predict_original_means(data_tall, model_results$csim, T)
+#source('mre_muscle_predict.R')
+#load("models_temp.Rdata")
+#means <- muscle_predict_original_means(data_tall, model_results$csim, T)
+print("Chart accidentally lost (but can easily be remade)")
 ```
 
 The model  and the original data showed good agreement on the larger muscles such as the adductors (AL, AM), biceps femoris (BLH,BSH), and extensors (VI, VL, VM). It showed poor predictivity on the muscle groups with much smaller numbers of samples (e.g. G, RF, S) and these variables also scored highest on both diagnostics.
 
 Below we compare histograms of the original and predicted data:
 ```{r fig.height = 3.5, fig.width = 7}
-load("sample_histograms.RData")
-XLIMS = c(0, 4000)
-par(mfrow=c(2,2))
-hist(data_tall$value[which(data_tall$cond_id == "Pre" & data_tall$musc_id == "VL")], 
-     main="Orig Pre", breaks=32, xlim = XLIMS, xlab=NULL, ylab=NULL)
-hist(data_tall$value[which(data_tall$cond_id == "Post" & data_tall$musc_id == "VL")],
-     main="Orig Post", breaks=32, xlim = XLIMS, xlab=NULL, ylab=NULL)
-hist(sample_hist_off, main="Samples Pre", breaks=32, xlim = XLIMS, xlab=NULL, ylab=NULL)
-hist(sample_hist_on, main="Samples Post", breaks=32, xlim = XLIMS, xlab=NULL, ylab=NULL)
+source('muscle_print_histogram_comparison.R')
+load(file.path(proj_path, "sample_histograms.RData"))
+ls()
+summary(sample_hist_on)
+#print_histogram_comparison(data_tall, sample_hist_on, sample_hist_off)
+
 ```
 Here it can be seen that the tail of the original data increases from pre to post, however the tails between the pre- and post- conditions of the predictive posterior samples are very similar. This suggests that more samples will likely be needed to successfully model the changes in the thin tail at the top of the data.
 
@@ -140,3 +141,12 @@ Here it can be seen that the tail of the original data increases from pre to pos
 
 This model struggled to converge or model the change in shape of the original data. Two likely ways to improve the model are to increase the number of samples, or to alter the prior on the change in shape function. For the second iteration, this second idea was tried first. The prior on $\delta_{0}$ was kept as an exponential, as it is known to be positive and not high, but $\delta_{1}$, as a change between two shapes, does not need this constraint. For the second iteration $\delta_{1}$ was modeled as normal.
 
+# Iteration 2
+
+Our second iteration, modelling $\delta_{1}$ as normal, showed good convergence and diagnostics. Predictive modelling results are shown below:
+```{r fig.height = 3.5, fig.width = 7}
+source('mre_muscle_predict.R')
+load("models_temp.Rdata")
+means <- muscle_predict_original_means(data_tall, model_results$csim, T)
+```
+Here the modelling appeared to be a good predictor for all muscles except G, RF, and S, which I believe are the three smallest, so perhaps their distriibutions are the least stable.

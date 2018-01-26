@@ -1,3 +1,5 @@
+require(HDInterval)
+
 samples_to_hdis <- function(samples) {
     n_pix <- ncol(samples)
     n_vars <- n_pix / 2
