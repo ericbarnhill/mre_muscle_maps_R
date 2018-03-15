@@ -34,7 +34,7 @@ As elastography is an experimental measurement method, it was unknown what the s
 Data was assembled into tidy format from separate spreadsheets by subject and muscle.
 ```{r}
 source('muscle_load_clean_data.R')
-data_tall <- load_clean_data(file.path(proj_path, data_path))
+data_tall <- load_clean_data(file.path(proj_path, data_path), 8)
 ```
 A boxplot of stiffness values by muscle group, shows heavy right skew, classic signs of a gamma or lognormal distribution. Comparing the groups pre- and post- shows that while the medians of the distributions remain relatively similar, for some groups (including the Vastus muscles) the skew increases greatly. This suggests that some of the effect mays be in the dispersion function of the distribution and not just the central tendency. We therefore probably want to model the shape function by muscle and condition, rather than just the scaling function (or its inverse, the rate function).
 
@@ -66,7 +66,7 @@ Each data entry has a pixel-wise location, a muscle location, and a location wit
 ggplot(data_tall) + 
     geom_boxplot(aes(x=grp_id, y=log(value))) +
     facet_grid(. ~ cond_id) +
-    labs(title="Log Value By Muscle, Pre And Post",x="Muscle",y="Shear Modulus(Pa)")
+    labs(title="Log Value By Muscle Type, Pre And Post",x="Muscle",y="Shear Modulus(Pa)")
 ```
 
 `r f.ref('fig_3')` shows similar trends. Medians, in particular of adductors and extensors, are quite similar, indicating that modelling an intercept by muscle group will likely produce uniqueness problems. However, the externsors show a clear change in dispersion that the adductors and flexors do not.
@@ -142,4 +142,20 @@ print(colMeans(del1) / colMeans(del0))
 ```
 What this shows, is that the delta 1 values in the converged model are negative by a substantial percentage of the original shape function. That means that the shape is getting wider (as a higher shape value is a more sharply defined curve, and a low shape value is a very broad curve).  And so I think this is a first sign of our finding. 
 
-To be continued...
+# Iteration 3
+
+Iteration 3 used a normal model on the log of the data, as suggested by my colleague Shravan Vasisth. 
+
+```{r}
+source("muscle_run_log_models.R")
+# sort data_tall by pix_id
+data_tall_2 <- data_tall[order(data_tall$pix_id),]
+levels(data_tall_2$pix_id) <- factor(data_tall_2$pix_id)
+#models <- run_log_models(data_tall)
+```
+Show predicted versus original data means
+```{r}
+source("mre_muscle_predict.R")
+muscle_predict_original_means(data_tall, models$csim, F)
+```
+

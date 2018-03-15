@@ -1,0 +1,58 @@
+---
+title: "Bayesian Mapping of Functional Muscle MRE Data"
+author: "Eric Barnhill"
+date: "January 19, 2018"
+output:
+  pdf_document: default
+  html_document: default
+csl: /home/ericbarnhill/Documents/code/styles/cell-numeric.csl
+bibliography: /home/ericbarnhill/Documents/git-misc/master-bibliography.bib
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(rjags)
+require(HDInterval)
+require(ggplot2)
+require(captioner)
+require(tidyr)
+proj_path="/home/ericbarnhill/Documents/code/R/mre_muscle_maps_R/"
+setwd(proj_path)
+source(file.path(proj_path, "mre_muscle_captions.R"))
+```
+
+## Introduction
+
+Magnetic Resonance Elastography (MRE) generates maps of tissue viscoelastic properties (for more details see [@hirsch2016magnetic]). In this study, such maps were acquired for a cohort of subjects both before and after eccentric muscle damage. This study aimed to analyse the location and extent of the impact of muscle damage on muscle viscoelastic properties.
+
+As elastography is an experimental measurement method, it was unknown what the stability and certainty levels of the data would be, and consequently what models would capture effects most robustly. We sought to generate a voxel-wise map of effects, but also investigated muscle-wise statistical models as they were expected to show increased robustness and statistical power due to pooling of data points.
+
+## Data Exploration
+
+# Data distributions
+
+Data was assembled into tidy format from separate spreadsheets by subject and muscle.
+```{r}
+source('muscle_load_clean_data.R')
+data_tall <- load_clean_data(file.path(proj_path, data_path), 4)
+```
+
+As data consisted of one control and one activation at each pixel, a simple linear model was run to test for significant interactions between pixel and condition. To avoid running the model when knitting the workbook, we can load it from the file "model_by_pixel.RData"
+```{r}
+# CODE TO RUN MODEL, COMMENTED OUT
+#start_time <- Sys.time()
+#mod_pix <- lm(formula = value ~ 1 + pix_id*cond_id, data = data_tall)
+#end_time <- Sys.time()
+#print(end_time - start_time)
+load("model_by_pixel.RData")
+```
+To avoid running the model again, 
+Confidence intervals were gathered by pixel. The original data was then indexed to create a matrix map of the high and low confidence intervals. The maps are then written out to Matlab objects so they can be easily viewed and manipulated in ImageJ-Matlab.
+```{r}
+LEVEL = 0.95 # can change to relax this constraint
+ci <- confint(mod_pix)
+ci_df <-pix_id_to_xy(ci, data_tall)
+maps <- xy_to_matrix(ci_df)
+writeMat('maps.mat', maps=maps)
+```
+
